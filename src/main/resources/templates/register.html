@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Register | School Timetable</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="container">
+    <div class="form-box">
+        <h2>Register</h2>
+        <form id="registerForm" method="POST" action="/auth/register">
+            <div class="input-group">
+                <label>Name</label>
+                <input type="text" name="name" placeholder="Enter your name" required>
+            </div>
+            <div class="input-group">
+                <label>Username</label>
+                <input type="text" name="username" placeholder="Choose username" required>
+            </div>
+            <div class="input-group">
+                <label>Password</label>
+                <input type="password" name="password" placeholder="Enter password" required>
+            </div>
+            <button type="submit" class="btn">Register</button>
+        </form>
+        <p class="toggle-text">Already have an account? <a href="/login-page">Login here</a></p>
+    </div>
+</div>
+</body>
+<script>
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const name = document.querySelector('input[name="name"]').value;
+    const username = document.querySelector('input[name="username"]').value;
+    const password = document.querySelector('input[name="password"]').value;
+
+    const response = await fetch('/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, username, password })
+    });
+
+    if (response.ok) {
+        alert('Registration successful! Redirecting to login...');
+        window.location.href = '/login-page';
+    } else {
+        const err = await response.text();
+        alert('Registration failed: ' + err);
+    }
+});
+</script>
+
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard | School Timetable</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="container">
+    <div class="dashboard-box">
+        <h2>Welcome to Dashboard!</h2>
+        <p id="welcomeMsg"></p>
+        <button id="logoutBtn" class="btn">Logout</button>
+        <div id="classesContainer" class="cards-container"></div>
+    </div>
+</div>
+
+<script>
+// Get token from localStorage
+const token = localStorage.getItem('jwtToken');
+if (!token) window.location.href = '/login-page';
+
+// Decode JWT to get username
+function parseJwt(token) {
+    const payload = token.split('.')[1];
+    return JSON.parse(atob(payload));
+}
+
+const user = parseJwt(token);
+document.getElementById('welcomeMsg').innerText = `Logged in as ${user.sub}`;
+
+// Logout
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    localStorage.removeItem('jwtToken');
+    window.location.href = '/login-page';
+});
+
+// Fetch classes from API
+async function fetchClasses() {
+    const response = await fetch('/api/classes', {
+        headers: { 'Authorization': 'Bearer ' + token }
+    });
+
+    if (response.ok) {
+        const data = await response.json();
+        const container = document.getElementById('classesContainer');
+        container.innerHTML = ''; // clear
+
+        data.forEach(cls => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <h3>${cls.name}</h3>
+                <p>Teacher: ${cls.teacher || 'N/A'}</p>
+                <p>Time: ${cls.time || 'N/A'}</p>
+            `;
+            container.appendChild(card);
+        });
+    } else {
+        alert('Failed to fetch classes');
+    }
+}
+
+fetchClasses();
+</script>
+</body>
+</html>
