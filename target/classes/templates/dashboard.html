@@ -1,67 +1,452 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <title>Dashboard | School Timetable</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
 </head>
 <body>
 <div class="container">
     <div class="dashboard-box">
         <h2>Welcome to Dashboard!</h2>
+
+        <!-- Display user info from server if available -->
+        <div th:if="${user}" class="user-info">
+            <p>Logged in as: <span th:text="${user.username}">User</span></p>
+            <p>Role: <span th:text="${user.role}">Role</span></p>
+        </div>
+
         <p id="welcomeMsg"></p>
-        <button id="logoutBtn" class="btn">Logout</button>
-        <div id="classesContainer" class="cards-container"></div>
+
+        <!-- Navigation Menu -->
+        <div class="nav-menu">
+            <button onclick="showSection('classes')" class="nav-btn active">Classes</button>
+            <button onclick="showSection('teachers')" class="nav-btn">Teachers</button>
+            <button onclick="showSection('subjects')" class="nav-btn">Subjects</button>
+            <button onclick="showSection('timetable')" class="nav-btn">Timetable</button>
+        </div>
+
+        <button id="logoutBtn" class="btn logout-btn">Logout</button>
+
+        <!-- Classes Section -->
+        <div id="classesSection" class="section active">
+            <h3>Class Management</h3>
+            <button onclick="showAddClassForm()" class="btn">Add New Class</button>
+            <div id="classesContainer" class="cards-container"></div>
+        </div>
+
+        <!-- Teachers Section -->
+        <div id="teachersSection" class="section">
+            <h3>Teacher Management</h3>
+            <div id="teachersContainer" class="cards-container"></div>
+        </div>
+
+        <!-- Subjects Section -->
+        <div id="subjectsSection" class="section">
+            <h3>Subject Management</h3>
+            <div id="subjectsContainer" class="cards-container"></div>
+        </div>
+
+        <!-- Timetable Section -->
+        <div id="timetableSection" class="section">
+            <h3>Timetable Management</h3>
+            <button onclick="generateTimetable()" class="btn">Generate Timetable</button>
+            <div id="timetableContainer" class="timetable-container"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Class Modal -->
+<div id="addClassModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3>Add New Class</h3>
+        <form id="addClassForm">
+            <div class="input-group">
+                <label>Class Name</label>
+                <input type="text" id="className" placeholder="e.g., Mathematics, Science" required>
+            </div>
+            <div class="input-group">
+                <label>Section</label>
+                <input type="text" id="classSection" placeholder="e.g., A, B, C" required>
+            </div>
+            <div class="input-group">
+                <label>Schedule Time</label>
+                <input type="text" id="classTime" placeholder="e.g., Mon 9:00-10:00">
+            </div>
+            <div class="input-group">
+                <label>Grade Level</label>
+                <input type="text" id="classGrade" placeholder="e.g., 10, 11, 12">
+            </div>
+            <button type="submit" class="btn">Add Class</button>
+        </form>
     </div>
 </div>
 
 <script>
-// Get token from localStorage
-const token = localStorage.getItem('jwtToken');
-if (!token) window.location.href = '/login-page';
+    // Authentication check
+    const token = localStorage.getItem('jwtToken');
+    if (!token) {
+        window.location.href = '/login-page';
+        throw new Error('No JWT token found');
+    }
 
-// Decode JWT to get username
-function parseJwt(token) {
-    const payload = token.split('.')[1];
-    return JSON.parse(atob(payload));
-}
+    // Parse JWT to get user info
+    function parseJwt(token) {
+        try {
+            const payload = token.split('.')[1];
+            return JSON.parse(atob(payload));
+        } catch (error) {
+            console.error('Error parsing JWT:', error);
+            localStorage.removeItem('jwtToken');
+            window.location.href = '/login-page';
+            return {};
+        }
+    }
 
-const user = parseJwt(token);
-document.getElementById('welcomeMsg').innerText = `Logged in as ${user.sub}`;
+    const user = parseJwt(token);
+    document.getElementById('welcomeMsg').innerText = `Welcome, ${user.sub || 'User'}!`;
 
-// Logout
-document.getElementById('logoutBtn').addEventListener('click', () => {
-    localStorage.removeItem('jwtToken');
-    window.location.href = '/login-page';
-});
+    // Navigation functions
+    function showSection(sectionName) {
+        // Hide all sections
+        document.querySelectorAll('.section').forEach(section => {
+            section.classList.remove('active');
+        });
 
-// Fetch classes from API
-async function fetchClasses() {
-    const response = await fetch('/api/classes', {
-        headers: { 'Authorization': 'Bearer ' + token }
+        // Remove active class from all buttons
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        // Show selected section and activate button
+        const targetSection = document.getElementById(sectionName + 'Section');
+        const targetButton = event.target;
+
+        if (targetSection) {
+            targetSection.classList.add('active');
+        }
+        if (targetButton) {
+            targetButton.classList.add('active');
+        }
+
+        // Load data for the section
+        switch(sectionName) {
+            case 'classes':
+                fetchClasses();
+                break;
+            case 'teachers':
+                fetchTeachers();
+                break;
+            case 'subjects':
+                fetchSubjects();
+                break;
+            case 'timetable':
+                fetchTimetable();
+                break;
+        }
+    }
+
+    // Logout functionality
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        localStorage.removeItem('jwtToken');
+        window.location.href = '/login-page';
     });
 
-    if (response.ok) {
-        const data = await response.json();
-        const container = document.getElementById('classesContainer');
-        container.innerHTML = ''; // clear
+    // ========== CLASS MANAGEMENT FUNCTIONS ==========
 
-        data.forEach(cls => {
-            const card = document.createElement('div');
-            card.className = 'card';
-            card.innerHTML = `
-                <h3>${cls.name}</h3>
-                <p>Teacher: ${cls.teacher || 'N/A'}</p>
-                <p>Time: ${cls.time || 'N/A'}</p>
-            `;
-            container.appendChild(card);
-        });
-    } else {
-        alert('Failed to fetch classes');
+    // Fetch and display classes
+    async function fetchClasses() {
+        try {
+            const response = await fetch('/api/classes', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const container = document.getElementById('classesContainer');
+                container.innerHTML = '';
+
+                if (data.length === 0) {
+                    container.innerHTML = '<p>No classes found. Add your first class!</p>';
+                    return;
+                }
+
+                data.forEach(cls => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                    <h3>${cls.name || 'Unnamed Class'}</h3>
+                    <p>Section: ${cls.section || 'N/A'}</p>
+                    <p>Grade: ${cls.grade || 'N/A'}</p>
+                    <p>Time: ${cls.time || 'N/A'}</p>
+                    <div class="card-actions">
+                        <button onclick="editClass(${cls.id})" class="btn-small">Edit</button>
+                        <button onclick="deleteClass(${cls.id})" class="btn-small btn-danger">Delete</button>
+                    </div>
+                `;
+                    container.appendChild(card);
+                });
+            } else {
+                console.error('Failed to fetch classes:', response.status);
+                alert('Failed to fetch classes. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error fetching classes:', error);
+            alert('Error fetching classes. Check console for details.');
+        }
     }
-}
 
-fetchClasses();
+    // Edit Class function
+    async function editClass(classId) {
+        try {
+            // Fetch class details
+            const response = await fetch(`/api/classes/${classId}`, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                const classData = await response.json();
+
+                // Populate modal with class data
+                document.getElementById('className').value = classData.name || '';
+                document.getElementById('classSection').value = classData.section || '';
+                document.getElementById('classTime').value = classData.time || '';
+                document.getElementById('classGrade').value = classData.grade || '';
+
+                // Change modal to edit mode
+                document.querySelector('#addClassModal h3').textContent = 'Edit Class';
+                document.querySelector('#addClassModal button[type="submit"]').textContent = 'Update Class';
+
+                // Store class ID for update
+                document.getElementById('addClassForm').dataset.editId = classId;
+
+                // Show modal
+                document.getElementById('addClassModal').style.display = 'block';
+            } else {
+                alert('Failed to fetch class details');
+            }
+        } catch (error) {
+            console.error('Error editing class:', error);
+            alert('Error editing class');
+        }
+    }
+
+    // Delete Class function
+    async function deleteClass(classId) {
+        if (!confirm('Are you sure you want to delete this class?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/classes/${classId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                alert('Class deleted successfully!');
+                fetchClasses(); // Refresh the list
+            } else {
+                const errorText = await response.text();
+                alert('Failed to delete class: ' + errorText);
+            }
+        } catch (error) {
+            console.error('Error deleting class:', error);
+            alert('Error deleting class');
+        }
+    }
+
+    // ========== TEACHER MANAGEMENT FUNCTIONS ==========
+
+    // Fetch teachers
+    async function fetchTeachers() {
+        try {
+            const response = await fetch('/api/teachers', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                const teachers = await response.json();
+                const container = document.getElementById('teachersContainer');
+                container.innerHTML = '';
+
+                if (teachers.length === 0) {
+                    container.innerHTML = '<p>No teachers found.</p>';
+                    return;
+                }
+
+                teachers.forEach(teacher => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                    <h3>${teacher.name || 'Unnamed Teacher'}</h3>
+                    <p>Email: ${teacher.email || 'N/A'}</p>
+                    <p>Subjects: ${teacher.subjects ? teacher.subjects.map(s => s.name).join(', ') : 'N/A'}</p>
+                `;
+                    container.appendChild(card);
+                });
+            } else {
+                console.error('Failed to fetch teachers');
+            }
+        } catch (error) {
+            console.error('Error fetching teachers:', error);
+        }
+    }
+
+    // ========== SUBJECT MANAGEMENT FUNCTIONS ==========
+
+    // Fetch subjects
+    async function fetchSubjects() {
+        try {
+            const response = await fetch('/api/subjects', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                const subjects = await response.json();
+                const container = document.getElementById('subjectsContainer');
+                container.innerHTML = '';
+
+                if (subjects.length === 0) {
+                    container.innerHTML = '<p>No subjects found.</p>';
+                    return;
+                }
+
+                subjects.forEach(subject => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                    <h3>${subject.name || 'Unnamed Subject'}</h3>
+                    <p>Code: ${subject.code || 'N/A'}</p>
+                    <p>Teacher: ${subject.teacher ? subject.teacher.name : 'N/A'}</p>
+                `;
+                    container.appendChild(card);
+                });
+            } else {
+                console.error('Failed to fetch subjects');
+            }
+        } catch (error) {
+            console.error('Error fetching subjects:', error);
+        }
+    }
+
+    // ========== TIMETABLE FUNCTIONS ==========
+
+    // Fetch timetable
+    async function fetchTimetable() {
+        try {
+            const response = await fetch('/api/timetables', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                const timetable = await response.json();
+                const container = document.getElementById('timetableContainer');
+                // Implement timetable display logic here
+                container.innerHTML = '<p>Timetable display coming soon...</p>';
+            } else {
+                console.error('Failed to fetch timetable');
+            }
+        } catch (error) {
+            console.error('Error fetching timetable:', error);
+        }
+    }
+
+    // Generate timetable
+    async function generateTimetable() {
+        try {
+            const response = await fetch('/api/timetables/generate', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                alert('Timetable generated successfully!');
+                fetchTimetable();
+            } else {
+                alert('Failed to generate timetable');
+            }
+        } catch (error) {
+            console.error('Error generating timetable:', error);
+            alert('Error generating timetable');
+        }
+    }
+
+    // ========== MODAL FUNCTIONALITY ==========
+
+    // Show add class form
+    function showAddClassForm() {
+        // Reset form and set to add mode
+        document.getElementById('addClassForm').reset();
+        document.querySelector('#addClassModal h3').textContent = 'Add New Class';
+        document.querySelector('#addClassModal button[type="submit"]').textContent = 'Add Class';
+        delete document.getElementById('addClassForm').dataset.editId;
+
+        document.getElementById('addClassModal').style.display = 'block';
+    }
+
+    // Close modal when clicking X
+    document.querySelector('.close').addEventListener('click', () => {
+        document.getElementById('addClassModal').style.display = 'none';
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener('click', (event) => {
+        const modal = document.getElementById('addClassModal');
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+
+    // Handle class form submission
+    document.getElementById('addClassForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const className = document.getElementById('className').value;
+        const classSection = document.getElementById('classSection').value;
+        const classTime = document.getElementById('classTime').value;
+        const classGrade = document.getElementById('classGrade').value;
+        const editId = document.getElementById('addClassForm').dataset.editId;
+
+        const classData = {
+            name: className,
+            section: classSection, // This is the required field
+            time: classTime || null,
+            grade: classGrade || null
+        };
+
+        try {
+            const url = editId ? `/api/classes/${editId}` : '/api/classes';
+            const method = editId ? 'PUT' : 'POST';
+
+            console.log('Sending class data:', classData); // For debugging
+
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify(classData)
+            });
+
+            if (response.ok) {
+                alert(`Class ${editId ? 'updated' : 'added'} successfully!`);
+                document.getElementById('addClassModal').style.display = 'none';
+                fetchClasses(); // Refresh the classes list
+            } else {
+                const errorText = await response.text();
+                alert(`Failed to ${editId ? 'update' : 'add'} class: ${errorText}`);
+            }
+        } catch (error) {
+            console.error('Error saving class:', error);
+            alert('Error saving class: ' + error.message);
+        }
+    });
+
+    // Initialize dashboard
+    fetchClasses();
 </script>
 </body>
 </html>

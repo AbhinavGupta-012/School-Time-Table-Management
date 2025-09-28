@@ -1,49 +1,61 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <title>Login | School Timetable</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
 </head>
 <body>
 <div class="container">
     <div class="form-box">
         <h2>Login</h2>
-        <form id="loginForm">
+
+        <!-- Display error message if any -->
+        <div th:if="${param.error}" class="error-message">
+            Invalid username or password!
+        </div>
+
+        <div th:if="${param.logout}" class="success-message">
+            You have been logged out successfully.
+        </div>
+
+        <!-- Using Thymeleaf form with CSRF protection -->
+        <form id="loginForm" th:action="@{/auth/login}" method="post">
             <div class="input-group">
-                <label>Username</label>
-                <input type="text" id="username" placeholder="Enter username" required>
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Enter username" required>
             </div>
             <div class="input-group">
-                <label>Password</label>
-                <input type="password" id="password" placeholder="Enter password" required>
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter password" required>
             </div>
             <button type="submit" class="btn">Login</button>
         </form>
-        <p class="toggle-text">Don't have an account? <a href="/register-page">Register here</a></p>
+        <p class="toggle-text">Don't have an account? <a th:href="@{/register-page}">Register here</a></p>
     </div>
 </div>
 
+<!-- Alternative JavaScript approach (keep as backup) -->
 <script>
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
 
-    const response = await fetch('/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        const response = await fetch('/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (response.ok) {
+            const token = await response.text();
+            localStorage.setItem('jwtToken', token);
+            window.location.href = '/dashboard-page';
+        } else {
+            alert('Login failed!');
+        }
     });
-
-    if (response.ok) {
-        const token = await response.text();
-        localStorage.setItem('jwtToken', token);
-        window.location.href = '/dashboard-page';
-    } else {
-        alert('Login failed!');
-    }
-});
 </script>
 </body>
 </html>

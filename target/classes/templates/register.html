@@ -1,55 +1,62 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <title>Register | School Timetable</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
 </head>
 <body>
 <div class="container">
     <div class="form-box">
         <h2>Register</h2>
-        <form id="registerForm" method="POST" action="/auth/register">
+
+        <!-- Display success/error messages -->
+        <div th:if="${success}" class="success-message" th:text="${success}"></div>
+        <div th:if="${error}" class="error-message" th:text="${error}"></div>
+
+        <!-- Thymeleaf form with CSRF -->
+        <form id="registerForm" th:action="@{/auth/register}" th:object="${user}" method="post">
             <div class="input-group">
-                <label>Name</label>
-                <input type="text" name="name" placeholder="Enter your name" required>
+                <label for="name">Name</label>
+                <input type="text" id="name" th:field="*{name}" placeholder="Enter your name" required>
             </div>
             <div class="input-group">
-                <label>Username</label>
-                <input type="text" name="username" placeholder="Choose username" required>
+                <label for="username">Username</label>
+                <input type="text" id="username" th:field="*{username}" placeholder="Choose username" required>
             </div>
             <div class="input-group">
-                <label>Password</label>
-                <input type="password" name="password" placeholder="Enter password" required>
+                <label for="password">Password</label>
+                <input type="password" id="password" th:field="*{password}" placeholder="Enter password" required>
             </div>
             <button type="submit" class="btn">Register</button>
         </form>
-        <p class="toggle-text">Already have an account? <a href="/login-page">Login here</a></p>
+        <p class="toggle-text">Already have an account? <a th:href="@{/login-page}">Login here</a></p>
     </div>
 </div>
-</body>
+
+<!-- JavaScript fallback -->
 <script>
-document.getElementById('registerForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
 
-    const name = document.querySelector('input[name="name"]').value;
-    const username = document.querySelector('input[name="username"]').value;
-    const password = document.querySelector('input[name="password"]').value;
+        const name = document.getElementById('name').value;
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
 
-    const response = await fetch('/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, username, password })
+        const response = await fetch('/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, username, password })
+        });
+
+        if (response.ok) {
+            alert('Registration successful! Redirecting to login...');
+            window.location.href = '/login-page';
+        } else {
+            const err = await response.text();
+            alert('Registration failed: ' + err);
+        }
     });
-
-    if (response.ok) {
-        alert('Registration successful! Redirecting to login...');
-        window.location.href = '/login-page';
-    } else {
-        const err = await response.text();
-        alert('Registration failed: ' + err);
-    }
-});
 </script>
-
+</body>
 </html>
