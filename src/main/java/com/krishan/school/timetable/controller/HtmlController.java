@@ -6,6 +6,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class HtmlController {
 
+	 @GetMapping("/")
+	    public String home() {
+	        return "login";  // looks for src/main/resources/templates/login.html
+	    }
     // Login page
     @GetMapping("/login-page")
     public String loginPage() {
